@@ -282,11 +282,16 @@ def unroll_tf(G, input_seq, ntimes=None):
         if not isinstance(input_val, (tuple, list)):
             input_seq[k] = [input_val] * ntimes
 
+    node_attr = {}
     for node, attr in G.nodes(data=True):
         attr['outputs'] = []
         attr['states'] = []
-
-    for node, attr in G.nodes(data=True):  # Loop over nodes
+        node_attr[node] = attr
+    
+    s = nx.topological_sort(G) # traverse nodes in topological order
+    for node in s:  # Loop over nodes in topological order
+        print(node)
+        attr = node_attr[node]
         for t in range(ntimes):  # Loop over time
             if t == 0:
                 inputs = []
