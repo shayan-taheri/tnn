@@ -288,9 +288,8 @@ def unroll_tf(G, input_seq, ntimes=None):
         attr['states'] = []
         node_attr[node] = attr
     
-    s = nx.topological_sort(G) # traverse nodes in topological order
+    s = nx.topological_sort(G) # sort nodes in topological order
     for node in s:  # Loop over nodes in topological order
-        print(node)
         attr = node_attr[node]
         for t in range(ntimes):  # Loop over time
             if t == 0:
