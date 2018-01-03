@@ -943,4 +943,125 @@ class GenFuncCell(RNNCell):
         # if self.output is not None:
         return self.output_shape_tmp
         # else:
+        #     raise ValueError('Output not initialized yet
+
+
+class StaticCell(RNNCell):
+
+    def __init__(self,
+                 harbor_shape,
+                 harbor=(harbor, None),
+                 pre_memory=None,
+                 memory=(memory, None),
+                 post_memory=None,
+                 input_init=(tf.zeros, None),
+                 state_init=(tf.zeros, None),
+                 dtype=tf.float32,
+                 name=None
+                 ):
+
+        ''' This cell just passes the input through, useful for extracting feedforward
+        component of recurrent network'''
+
+        self.harbor_shape = harbor_shape
+        self.harbor = harbor if harbor[1] is not None else (harbor[0], {})
+        self.pre_memory = pre_memory
+        self.memory = memory if memory[1] is not None else (memory[0], {})
+        self.post_memory = post_memory
+
+        self.input_init = input_init if input_init[1] is not None else (input_init[0], {})
+        self.state_init = state_init if state_init[1] is not None else (state_init[0], {})
+
+        self.dtype_tmp = dtype
+        self.name_tmp = name
+
+        self._reuse = None
+
+    def __call__(self, inputs=None, state=None):
+        """
+        Produce outputs given inputs
+
+        If inputs or state are None, they are initialized from scratch.
+
+        :Kwargs:
+            - inputs (list)
+                A list of inputs. Inputs are combined using the harbor function
+            - state
+
+        :Returns:
+            (output, state)
+        """
+        # if hasattr(self, 'output') and inputs is None:
+        #     raise ValueError('must provide inputs')
+
+        # if inputs is None:
+        #     inputs = [None] * len(self.input_shapes)
+        # import pdb; pdb.set_trace()
+
+        with tf.variable_scope(self.name_tmp, reuse=self._reuse):
+            # inputs_full = []
+            # for inp, shape, dtype in zip(inputs, self.input_shapes, self.input_dtypes):
+            #     if inp is None:
+            #         inp = self.output_init[0](shape=shape, dtype=dtype, **self.output_init[1])
+            #     inputs_full.append(inp)
+
+            if inputs is None:
+                inputs = [self.input_init[0](shape=self.harbor_shape,
+                                             **self.input_init[1])]
+            output = self.harbor[0](inputs, self.harbor_shape, self.name_tmp, reuse=self._reuse, **self.harbor[1])
+
+            pre_name_counter = 0
+            for function, kwargs in self.pre_memory:
+                with tf.variable_scope("pre_" + str(pre_name_counter), reuse=self._reuse):
+                    if function.__name__ == "component_conv":
+                       output = function(output, inputs, **kwargs) # component_conv needs to know the inputs
+                    else:
+                       output = function(output, **kwargs)
+
+                pre_name_counter += 1
+            if state is None:
+                state = self.state_init[0](shape=output.shape,
+                                           dtype=self.dtype_tmp,
+                                           **self.state_init[1])
+
+            # state = self.memory[0](output, state, **self.memory[1])
+            self.state = tf.identity(state, name='state')
+
+            # output = self.state
+            post_name_counter = 0
+            for function, kwargs in self.post_memory:
+                with tf.variable_scope("post_" + str(post_name_counter), reuse=self._reuse):
+                    if function.__name__ == "component_conv":
+                       output = function(output, inputs, **kwargs)
+                    else:
+                       output = function(output, **kwargs)
+                post_name_counter += 1
+            self.output_tmp = tf.identity(tf.cast(output, self.dtype_tmp), name='output')
+            # scope.reuse_variables()
+            self._reuse = True
+        self.state_shape = self.state.shape
+        self.output_shape_tmp = self.output_tmp.shape
+        return self.output_tmp, self.state
+
+    @property
+    def state_size(self):
+        """
+        Size(s) of state(s) used by this cell.
+
+        It can be represented by an Integer, a TensorShape or a tuple of Integers
+        or TensorShapes.
+        """
+        # if self.state is not None:
+        return self.state_shape
+        # else:
+        #     raise ValueError('State not initialized yet')
+
+    @property
+    def output_size(self):
+        """
+        Integer or TensorShape: size of outputs produced by this cell.
+        """
+        # if self.output is not None:
+        return self.output_shape_tmp
+        # else:
         #     raise ValueError('Output not initialized yet')
